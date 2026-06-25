@@ -63,8 +63,10 @@ export interface MotifSpec {
   cyFrac: number;
   /** Radius / size as a fraction of the short edge U. */
   scale: number;
-  /** −1..1: directional bright limb (ring only). */
+  /** −1..1: directional bright limb, horizontal (ring only). */
   shadowX?: number;
+  /** −1..1: directional bright limb, vertical (ring only). */
+  shadowY?: number;
   /** Bright-limb size as a multiple of the ring radius. */
   limbSize?: number;
   /** Glow spread of the bright limb, 0..1. */
@@ -76,6 +78,9 @@ export interface CropSpec {
   offsetLat: number;
   offsetLon: number;
 }
+
+/** Edge the gradient emanates from (ticket layout only). */
+export type GradientDir = "top" | "bottom" | "left" | "right";
 
 export interface PosterVariant {
   seed: string;
@@ -89,6 +94,8 @@ export interface PosterVariant {
   grainIntensity: number;
   /** feTurbulence seed so the grain field itself varies per poster. */
   grainSeed: number;
+  /** Ticket-only: which edge the partial gradient comes in from. */
+  gradientDir?: GradientDir;
 }
 
 /** Tunable ranges/weights for the generator (dialed in the tuning studio). */
@@ -105,6 +112,7 @@ export interface TuneConfig {
     /** Center-y range as a fraction of height: [min, max]. */
     y: [number, number];
     shadowX: number;
+    shadowY: number;
     limbSize: number;
     glowArea: number;
   };
@@ -124,7 +132,7 @@ export interface TuneConfig {
 }
 
 export const DEFAULT_TUNE: TuneConfig = {
-  ring: { on: true, scale: [0.24, 0.58], x: [0.35, 0.65], y: [0.30, 0.52], shadowX: 0, limbSize: 1.6, glowArea: 0.6 },
+  ring: { on: true, scale: [0.24, 0.58], x: [0.35, 0.65], y: [0.30, 0.52], shadowX: 0, shadowY: 0, limbSize: 1.6, glowArea: 0.6 },
   containedProb: 0.28,
   recipes: RECIPES.map(() => true),
   layout: DEFAULT_LAYOUT,
@@ -156,6 +164,7 @@ export function makeVariant(
         cyFrac: rng.float(cfg.ring.y[0], cfg.ring.y[1]),
         scale: rng.float(cfg.ring.scale[0], cfg.ring.scale[1]),
         shadowX: cfg.ring.shadowX,
+        shadowY: cfg.ring.shadowY,
         limbSize: cfg.ring.limbSize,
         glowArea: cfg.ring.glowArea,
       }
@@ -177,5 +186,6 @@ export function makeVariant(
     headlineScale: rng.float(cfg.headlineScale[0], cfg.headlineScale[1]),
     grainIntensity: rng.float(cfg.grain[0], cfg.grain[1]),
     grainSeed: rng.int(1, 97),
+    gradientDir: "bottom",
   };
 }

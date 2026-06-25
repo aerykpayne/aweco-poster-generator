@@ -226,20 +226,23 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
             )}
           </div>
 
-          <div style={panel}>
-            <p style={h}>HEADLINE</p>
-            <textarea value={headline} onChange={(e) => setHeadline(e.target.value)} rows={2} spellCheck={false} style={{ ...input, resize: "vertical", lineHeight: 1.5 }} />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
-              {ASPIRATIONS.map((a) => (
-                <button key={a} onClick={() => setHeadline(a)} title={a} style={{ fontFamily: MONO, fontSize: 9, color: "#8e8d8d", background: "transparent", border: "1px solid #2a2d33", borderRadius: 2, padding: "3px 6px", cursor: "pointer" }}>
-                  {a.length > 16 ? a.slice(0, 15) + "…" : a}
-                </button>
-              ))}
+          {/* Headline copy is irrelevant to the ticket layout. */}
+          {!isTicket && (
+            <div style={panel}>
+              <p style={h}>HEADLINE</p>
+              <textarea value={headline} onChange={(e) => setHeadline(e.target.value)} rows={2} spellCheck={false} style={{ ...input, resize: "vertical", lineHeight: 1.5 }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+                {ASPIRATIONS.map((a) => (
+                  <button key={a} onClick={() => setHeadline(a)} title={a} style={{ fontFamily: MONO, fontSize: 9, color: "#8e8d8d", background: "transparent", border: "1px solid #2a2d33", borderRadius: 2, padding: "3px 6px", cursor: "pointer" }}>
+                    {a.length > 16 ? a.slice(0, 15) + "…" : a}
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <Range label="size" min={0.6} max={1.6} step={0.01} value={variant.headlineScale} onChange={(n) => setVariant((v) => ({ ...v, headlineScale: n }))} />
+              </div>
             </div>
-            <div style={{ marginTop: 10 }}>
-              <Range label="size" min={0.6} max={1.6} step={0.01} value={variant.headlineScale} onChange={(n) => setVariant((v) => ({ ...v, headlineScale: n }))} />
-            </div>
-          </div>
+          )}
 
           <div style={panel}>
             <p style={h}>ECLIPSE RING</p>
@@ -250,6 +253,7 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
               <Range label="position y" min={0} max={1} step={0.01} value={m.cyFrac} onChange={(n) => setMotif({ cyFrac: n })} />
               <p style={{ ...lbl, fontSize: 9, letterSpacing: 1.5, margin: "12px 0 6px", borderTop: "1px solid #2a2d33", paddingTop: 9 }}>SUN SETTINGS</p>
               <Range label="shadow x" min={-1} max={1} step={0.05} value={m.shadowX ?? 0} onChange={(n) => setMotif({ shadowX: n })} />
+              <Range label="shadow y" min={-1} max={1} step={0.05} value={m.shadowY ?? 0} onChange={(n) => setMotif({ shadowY: n })} />
               <Range label="limb size" min={0.5} max={3} step={0.05} value={m.limbSize ?? 1.6} onChange={(n) => setMotif({ limbSize: n })} />
               <Range label="glow area" min={0} max={1} step={0.02} value={m.glowArea ?? 0.6} onChange={(n) => setMotif({ glowArea: n })} />
             </div>
@@ -259,9 +263,14 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
             <p style={h}>GRADIENT</p>
             <Seg label="recipe" value={RECIPES[recipeIdx].name} options={RECIPES.map((r) => r.name)} onChange={(name) => regenGradient(RECIPES.findIndex((r) => r.name === name), contained, gradSeed)} />
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
-              <Check on={contained} label="contained" onToggle={() => regenGradient(recipeIdx, !contained, gradSeed)} />
+              {!isTicket && <Check on={contained} label="contained" onToggle={() => regenGradient(recipeIdx, !contained, gradSeed)} />}
               <button onClick={() => { const gs = randomSeed(); setGradSeed(gs); regenGradient(recipeIdx, contained, gs); }} style={{ fontFamily: MONO, fontSize: 9.5, color: "#8e8d8d", background: "transparent", border: "1px solid #2a2d33", borderRadius: 2, padding: "4px 8px", cursor: "pointer" }}>re-roll ↻</button>
             </div>
+            {isTicket && (
+              <div style={{ marginTop: 8 }}>
+                <Seg label="direction" value={variant.gradientDir ?? "bottom"} options={["bottom", "top", "left", "right"] as const} onChange={(d) => setVariant((v) => ({ ...v, gradientDir: d }))} />
+              </div>
+            )}
           </div>
 
           <div style={panel}>
@@ -276,14 +285,21 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
             </div>
           </div>
 
-          <div style={panel}>
-            <p style={h}>HEADLINE LAYOUT</p>
-            <Seg label="position" value={variant.layout.headline.vpos} options={["high", "low"] as const} onChange={(v) => setHl({ vpos: v })} />
-            <Seg label="" value={variant.layout.headline.hpos} options={["left", "center", "right"] as const} onChange={(v) => setHl({ hpos: v })} />
-            <Seg label="axis" value={variant.layout.headline.axis} options={["horizontal", "vertical"] as const} onChange={(v) => setHl({ axis: v })} />
-            <Seg label="align" value={variant.layout.headline.align} options={["left", "center", "right"] as const} onChange={(v) => setHl({ align: v })} />
-            <Check on={variant.layout.headline.editorial} label="editorial italic" onToggle={() => setHl({ editorial: !variant.layout.headline.editorial })} />
-          </div>
+          {isTicket ? (
+            <div style={panel}>
+              <p style={h}>TYPOGRAPHY</p>
+              <Check on={variant.layout.headline.editorial} label="editorial italic" onToggle={() => setHl({ editorial: !variant.layout.headline.editorial })} />
+            </div>
+          ) : (
+            <div style={panel}>
+              <p style={h}>HEADLINE LAYOUT</p>
+              <Seg label="position" value={variant.layout.headline.vpos} options={["high", "low"] as const} onChange={(v) => setHl({ vpos: v })} />
+              <Seg label="" value={variant.layout.headline.hpos} options={["left", "center", "right"] as const} onChange={(v) => setHl({ hpos: v })} />
+              <Seg label="axis" value={variant.layout.headline.axis} options={["horizontal", "vertical"] as const} onChange={(v) => setHl({ axis: v })} />
+              <Seg label="align" value={variant.layout.headline.align} options={["left", "center", "right"] as const} onChange={(v) => setHl({ align: v })} />
+              <Check on={variant.layout.headline.editorial} label="editorial italic" onToggle={() => setHl({ editorial: !variant.layout.headline.editorial })} />
+            </div>
+          )}
 
           <div style={panel}>
             <p style={h}>METADATA</p>

@@ -195,6 +195,7 @@ export function PosterSVG({
         gradient={g}
         uid={uid}
         shadowX={motif.shadowX}
+        shadowY={motif.shadowY}
         limbSize={motif.limbSize}
         glowArea={motif.glowArea}
       />

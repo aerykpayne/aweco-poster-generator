@@ -150,6 +150,7 @@ export function TuningStudio({ eclipseId, location, aspiration, baseSpanDeg }: P
             SUN SETTINGS
           </p>
           <Range label="shadow x" min={-1} max={1} step={0.05} value={cfg.ring.shadowX} onChange={(n) => setRing({ shadowX: n })} />
+          <Range label="shadow y" min={-1} max={1} step={0.05} value={cfg.ring.shadowY} onChange={(n) => setRing({ shadowY: n })} />
           <Range label="limb size" min={0.5} max={3} step={0.05} value={cfg.ring.limbSize} onChange={(n) => setRing({ limbSize: n })} />
           <Range label="glow area" min={0} max={1} step={0.02} value={cfg.ring.glowArea} onChange={(n) => setRing({ glowArea: n })} />
         </div>

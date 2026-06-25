@@ -20,6 +20,8 @@ interface CircleMotifProps {
   /** −1..1: pushes the corona's bright limb to the left/right edge (the
    *  diamond-ring effect). 0 = even rim. Only used by the ring motif. */
   shadowX?: number;
+  /** −1..1: pushes the corona's bright limb up/down. 0 = even rim. */
+  shadowY?: number;
   /** Bright-limb size as a multiple of the ring radius (ring only). */
   limbSize?: number;
   /** Glow spread of the bright limb, 0..1 (ring only). */
@@ -34,6 +36,7 @@ export function CircleMotif({
   gradient,
   uid,
   shadowX = 0,
+  shadowY = 0,
   limbSize = 1.18,
   glowArea = 0.34,
 }: CircleMotifProps) {
@@ -66,10 +69,11 @@ export function CircleMotif({
     // scales its radius; `glowArea` pushes the warm band outward so the glow
     // reads larger and softer.
     const limbX = cx + shadowX * r * 0.9;
+    const limbY = cy + shadowY * r * 0.9;
     const corePct = 22 + glowArea * 50; // 22..72%
-    // The base (symmetric) corona fades out as the limb is pushed to one side,
+    // The base (symmetric) corona fades out as the limb is pushed off-center,
     // so the far side goes dark at the extremes — leaving the directional limb.
-    const baseFade = 1 - Math.abs(shadowX);
+    const baseFade = 1 - Math.min(1, Math.hypot(shadowX, shadowY));
     return (
       <g>
         <defs>
@@ -87,7 +91,7 @@ export function CircleMotif({
         {/* base symmetric corona — broad, soft halo */}
         <circle cx={cx} cy={cy} r={r * 1.7} fill={`url(#${cid})`} />
         {/* directional bright limb (covered at centre by the disc) */}
-        <circle cx={limbX} cy={cy} r={r * limbSize} fill={`url(#${lid})`} />
+        <circle cx={limbX} cy={limbY} r={r * limbSize} fill={`url(#${lid})`} />
         {/* moon disc — the corona halo alone defines the rim (no extra stroke) */}
         <circle cx={cx} cy={cy} r={r} fill="#04070c" />
       </g>

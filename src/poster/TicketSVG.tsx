@@ -1,22 +1,22 @@
 /**
  * The "eclipse ticket" — a landscape boarding-pass-style stub generated for a
- * single location: where you are, the local contact time, the eclipse, and your
- * totality duration, with a tear-off stub carrying a unique admit-one code.
- * One self-contained SVG (ticket outline with side notches → clip → faint
- * geography → type), same {model, variant} signature as PosterSVG.
+ * single location. The BACKGROUND is the real poster atmosphere (seeded
+ * gradient + geography + eclipse-ring motif + grain) clipped to a notched
+ * ticket outline; the ticket copy (where you are, local contact time, the
+ * eclipse, your totality duration) and a tear-off admit-one stub sit on top.
+ * Same {model, variant} signature as PosterSVG.
  */
 import { fitProjection } from "@/lib/projection";
-import { landFeature } from "@/lib/coastline";
 import { formatDuration, formatObscuration } from "@/lib/astronomy";
+import { CircleMotif } from "@/poster/layers/CircleMotif";
+import { GeoLayer } from "@/poster/layers/GeoLayer";
 import { FRAME, type PosterModel } from "@/poster/types";
 import type { PosterVariant } from "@/poster/variant";
 
 const SANS = "var(--font-geist-sans), system-ui, -apple-system, sans-serif";
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";
+const EDITORIAL = "var(--font-editorial), Georgia, serif";
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-/** Round projection floats to 2dp so SSR and client markup match exactly. */
-const round2 = (d: string) => d.replace(/\d+\.\d+/g, (m) => Number(m).toFixed(2));
 
 /** Deterministic admit-one code from the poster seed, e.g. "UMBRA-K9X2". */
 function ticketCode(seed: string): string {
@@ -49,6 +49,35 @@ function fmtTime12(d: Date | undefined, tz: string): string {
   }).format(d);
 }
 
+/** Smoothstep easing, clamped to [0,1]. */
+function smoothstep(x: number): number {
+  const t = x < 0 ? 0 : x > 1 ? 1 : x;
+  return t * t * (3 - 2 * t);
+}
+
+function lerpHex(a: string, b: string, t: number): string {
+  const pa = a.replace("#", "");
+  const pb = b.replace("#", "");
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  const mix = (i: number) =>
+    Math.round(ch(pa, i) + (ch(pb, i) - ch(pa, i)) * t)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix(0)}${mix(2)}${mix(4)}`;
+}
+
+/** Interpolated colour at position t (0..1) along a sorted dark→light ramp. */
+function sampleRamp(stops: { offset: number; color: string }[], t: number): string {
+  const tt = t < 0 ? 0 : t > 1 ? 1 : t;
+  for (let i = 1; i < stops.length; i++) {
+    if (tt <= stops[i].offset) {
+      const span = stops[i].offset - stops[i - 1].offset || 1;
+      return lerpHex(stops[i - 1].color, stops[i].color, (tt - stops[i - 1].offset) / span);
+    }
+  }
+  return stops[stops.length - 1].color;
+}
+
 export function TicketSVG({
   model,
   variant,
@@ -57,10 +86,41 @@ export function TicketSVG({
   variant: PosterVariant;
 }) {
   const { w: W, h: H } = FRAME.ticket;
+  const U = Math.min(W, H);
   const uid = variant.seed.replace(/[^A-Za-z0-9]/g, "");
   const clipId = `ticket-clip-${uid}`;
-  const bgId = `ticket-bg-${uid}`;
+  const gradId = `ticket-atmo-${uid}`;
+  const grainId = `ticket-grain-${uid}`;
+  const scrimId = `ticket-scrim-${uid}`;
   const { circumstances: c, location: loc, eclipse } = model;
+  const g = variant.gradient;
+  const motif = variant.motif;
+
+  // Partial directional gradient: the recipe colours only occupy a band near
+  // the chosen edge and fade to transparent over a near-black base, so most of
+  // the ticket reads dark and the eclipse ring feels more dynamic.
+  const COVERAGE = 0.66; // fraction of the axis the colour band spans
+  const dir = variant.gradientDir ?? "bottom";
+  const DIR_COORDS = {
+    top: { x1: 0.5, y1: 1, x2: 0.5, y2: 0 },
+    bottom: { x1: 0.5, y1: 0, x2: 0.5, y2: 1 },
+    left: { x1: 1, y1: 0.5, x2: 0, y2: 0.5 },
+    right: { x1: 0, y1: 0.5, x2: 1, y2: 0.5 },
+  } as const;
+  const dc = DIR_COORDS[dir];
+  // offset 0 = far edge (transparent → base shows), offset 1 = emanating edge.
+  // Resample the recipe into many smoothstep-eased stops so both the colour
+  // ramp and the fade into the dark base are gradual (no banding / hard seams).
+  const start = 1 - COVERAGE;
+  const STEPS = 20;
+  const dirStops = Array.from({ length: STEPS + 1 }, (_, i) => {
+    const o = i / STEPS;
+    return {
+      offset: Number(o.toFixed(4)),
+      color: sampleRamp(g.stops, smoothstep((o - start) / COVERAGE)),
+      opacity: Number(smoothstep(o / start).toFixed(4)),
+    };
+  });
 
   const pad = 6;
   const left = pad;
@@ -90,15 +150,17 @@ export function TicketSVG({
     "Z",
   ].join(" ");
 
-  // Faint geography centered on the location, zoomed out to read as a region.
+  // Same projection the poster uses, so the geography matches the variant.
+  const center = {
+    lat: loc.lat + variant.crop.offsetLat,
+    lon: loc.lon + variant.crop.offsetLon,
+  };
   const fit = fitProjection(eclipse.path, loc, W, H, {
-    spanDeg: 64,
-    center: { lat: loc.lat, lon: loc.lon + 6 },
+    spanDeg: variant.crop.spanDeg,
+    center,
   });
-  const landD = round2(fit.pathGen(landFeature) ?? "");
-  const lineD = round2(fit.pathGen(eclipse.path) ?? "");
 
-  // ── Content ─────────────────────────────────────────────────
+  // ── Copy ────────────────────────────────────────────────────
   const M = 52;
   const placeName = loc.admin ? `${loc.name}, ${loc.admin}` : loc.name;
   const coordLine = `${fmtCoords(loc.lat, loc.lon)}  ·  ${fmtTime12(c.totalBegin ?? c.peak, loc.tz)}`;
@@ -107,9 +169,10 @@ export function TicketSVG({
   const big = inTot ? formatDuration(c.totalityDurationSec) : formatObscuration(c.obscuration);
   const bigLabel = inTot ? "of totality" : "coverage";
   const code = ticketCode(variant.seed);
-
   const stubCx = (tearX + W) / 2;
-  const sub = "rgba(255,255,255,0.62)";
+  const sub = "rgba(255,255,255,0.66)";
+  // Editorial-italic is an opt-in aesthetic for the display type (name + duration).
+  const editorial = variant.layout.headline.editorial;
 
   return (
     <svg
@@ -123,27 +186,88 @@ export function TicketSVG({
         <clipPath id={clipId}>
           <path d={outline} />
         </clipPath>
-        <linearGradient id={bgId} x1="0" y1="0" x2="0.35" y2="1">
-          <stop offset="0%" stopColor="#23272e" />
-          <stop offset="55%" stopColor="#15181d" />
-          <stop offset="100%" stopColor="#0d0f13" />
+        <linearGradient id={gradId} x1={dc.x1} y1={dc.y1} x2={dc.x2} y2={dc.y2}>
+          {dirStops.map((s, i) => (
+            <stop key={i} offset={s.offset} stopColor={s.color} stopOpacity={s.opacity} />
+          ))}
+        </linearGradient>
+        <filter id={grainId} x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves={3} seed={variant.grainSeed} stitchTiles="stitch" result="n" />
+          <feColorMatrix in="n" type="saturate" values="0" result="gray" />
+          <feComponentTransfer in="gray">
+            <feFuncR type="linear" slope="1.8" intercept="-0.4" />
+            <feFuncG type="linear" slope="1.8" intercept="-0.4" />
+            <feFuncB type="linear" slope="1.8" intercept="-0.4" />
+          </feComponentTransfer>
+        </filter>
+        {/* Legibility veil: darkens only the top and bottom edges (behind the
+            title and the big duration); the middle stays clear so a side
+            gradient still reads. */}
+        <linearGradient id={scrimId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#090b0f" stopOpacity={0.55} />
+          <stop offset="22%" stopColor="#090b0f" stopOpacity={0} />
+          <stop offset="62%" stopColor="#090b0f" stopOpacity={0} />
+          <stop offset="100%" stopColor="#090b0f" stopOpacity={0.8} />
         </linearGradient>
       </defs>
 
-      {/* Ticket body + faint geography, all clipped to the notched outline */}
+      {/* ── Dark base + partial poster gradient + ring, clipped to ticket ─ */}
       <g clipPath={`url(#${clipId})`}>
-        <rect x={0} y={0} width={W} height={H} fill={`url(#${bgId})`} />
-        <path d={landD} fill="rgba(255,255,255,0.05)" />
-        <path d={lineD} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={5} strokeLinejoin="round" strokeLinecap="round" />
-        <path d={lineD} fill="none" stroke="rgba(255,255,255,0.34)" strokeWidth={1.1} strokeLinejoin="round" strokeLinecap="round" />
+        <rect x={0} y={0} width={W} height={H} fill="#0c0e12" />
+        <rect x={0} y={0} width={W} height={H} fill={`url(#${gradId})`} />
+        <CircleMotif
+          kind={motif.kind}
+          cx={motif.cxFrac * W}
+          cy={motif.cyFrac * H}
+          r={motif.scale * U}
+          gradient={g}
+          uid={uid}
+          shadowX={motif.shadowX}
+          shadowY={motif.shadowY}
+          limbSize={motif.limbSize}
+          glowArea={motif.glowArea}
+        />
+      </g>
+
+      {/* Geography — same layer as the poster, clipped to the ticket. The
+          location dot stays; its label is suppressed (the copy names it). */}
+      <GeoLayer
+        fit={fit}
+        path={eclipse.path}
+        location={{ lat: loc.lat, lon: loc.lon }}
+        clipId={clipId}
+        style={{
+          coastline: "rgba(255,255,255,0.16)",
+          coastlineWidth: 0.6,
+          centerline: "#ffffff",
+          centerlineWidth: 1.4,
+          marker: "#ff5c02",
+          markerLabel: "rgba(255,255,255,0.92)",
+          labelFamily: MONO,
+        }}
+      />
+
+      {/* Grain + legibility veil */}
+      <g clipPath={`url(#${clipId})`}>
+        <rect x={0} y={0} width={W} height={H} filter={`url(#${grainId})`} opacity={variant.grainIntensity * 0.7} style={{ mixBlendMode: "overlay" }} />
+        <rect x={0} y={0} width={W} height={H} fill={`url(#${scrimId})`} />
       </g>
 
       {/* Outline + perforated tear line */}
-      <path d={outline} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth={1.4} />
-      <line x1={tearX} y1={top + 14} x2={tearX} y2={bottom - 14} stroke="rgba(255,255,255,0.28)" strokeWidth={1.2} strokeDasharray="2 6" />
+      <path d={outline} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1.4} />
+      <line x1={tearX} y1={top + 14} x2={tearX} y2={bottom - 14} stroke="rgba(255,255,255,0.3)" strokeWidth={1.2} strokeDasharray="2 6" />
 
       {/* ── Main info (left of the tear) ─────────────────────── */}
-      <text x={M} y={88} fontFamily={SANS} fontSize={31} fontWeight={600} fill="#ffffff" letterSpacing={-0.2}>
+      <text
+        x={M}
+        y={88}
+        fontFamily={editorial ? EDITORIAL : SANS}
+        fontSize={editorial ? 36 : 31}
+        fontStyle={editorial ? "italic" : "normal"}
+        fontWeight={editorial ? 400 : 600}
+        fill="#ffffff"
+        letterSpacing={editorial ? 0 : -0.2}
+      >
         {placeName}
       </text>
       <text x={M} y={118} fontFamily={SANS} fontSize={14} fill={sub} letterSpacing={0.2}>
@@ -154,15 +278,23 @@ export function TicketSVG({
       </text>
 
       <text x={M} y={H - 60} fontFamily={SANS} fill="#ffffff">
-        <tspan fontSize={70} fontWeight={700} letterSpacing={-2}>{big}</tspan>
-        <tspan fontSize={24} fontWeight={400} fill="rgba(255,255,255,0.6)" dx={12}>{bigLabel}</tspan>
+        <tspan
+          fontFamily={editorial ? EDITORIAL : SANS}
+          fontStyle={editorial ? "italic" : "normal"}
+          fontSize={editorial ? 78 : 70}
+          fontWeight={editorial ? 400 : 700}
+          letterSpacing={editorial ? 0 : -2}
+        >
+          {big}
+        </tspan>
+        <tspan fontSize={24} fontWeight={400} fill="rgba(255,255,255,0.7)" dx={12}>{bigLabel}</tspan>
       </text>
 
       {/* ── Stub (right of the tear) ─────────────────────────── */}
       <text transform={`translate(${stubCx - 8} ${midY}) rotate(-90)`} textAnchor="middle" fontFamily={MONO} fontSize={29} fontWeight={700} fill="#ffffff" letterSpacing={1.5}>
         {code}
       </text>
-      <text transform={`translate(${stubCx + 30} ${midY}) rotate(-90)`} textAnchor="middle" fontFamily={MONO} fontSize={9.5} fill="rgba(255,255,255,0.5)" letterSpacing={3}>
+      <text transform={`translate(${stubCx + 30} ${midY}) rotate(-90)`} textAnchor="middle" fontFamily={MONO} fontSize={9.5} fill="rgba(255,255,255,0.55)" letterSpacing={3}>
         ADMIT ONE: TOTALITY
       </text>
     </svg>
