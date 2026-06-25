@@ -127,8 +127,8 @@ export function TicketSVG({
   const right = W - pad;
   const top = pad;
   const bottom = H - pad;
-  const cr = 26; // corner radius
-  const notchR = 22;
+  const cr = 44; // corner radius — modest rounding
+  const notchR = 64; // large side cutouts
   const midY = H / 2;
   const tearX = Math.round(W * 0.74);
 
