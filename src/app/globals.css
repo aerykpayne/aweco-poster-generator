@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/*
+ * Brand theme — Awe Co / The Eclipse App.
+ * Color + type tokens mirror src/lib/tokens.ts (the canonical source for the
+ * SVG renderer). Keep the two in sync.
+ */
+@theme inline {
+  /* Flat Swiss fields */
+  --color-ink: #0e1216;
+  --color-paper: #e2e2e2;
+  --color-tertiary: #8e8d8d;
+  --color-sun: #fe9235;
+  --color-orange: #ff5c02;
+
+  /* Total-eclipse gradient stops (locked): black → purple → pink → white */
+  --color-eclipse-black: #04070c;
+  --color-eclipse-purple: #2f1b24;
+  --color-eclipse-pink: #fda689;
+  --color-eclipse-white: #ffffff;
+
+  /* Typography */
+  --font-display: var(--font-neue-york);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}

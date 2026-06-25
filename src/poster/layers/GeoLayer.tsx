@@ -1,0 +1,167 @@
+/**
+ * Geographic layer: faint coastline topoline + the path-of-totality center
+ * line + the location marker, all on one fitted projection (PLAN.md §7).
+ * Rendered as a fine, confident Swiss line — geometry only, no stylising.
+ */
+import type { FeatureCollection, LineString } from "geojson";
+import { landFeature } from "@/lib/coastline";
+import type { FittedProjection, LonLat } from "@/lib/projection";
+
+export interface GeoLayerStyle {
+  coastline: string;
+  coastlineWidth: number;
+  centerline: string;
+  centerlineWidth: number;
+  /** Optional under-stroke so the line reads on both dark and light zones. */
+  centerlineHalo?: string;
+  centerlineHaloWidth?: number;
+  /** Edge-of-totality limit lines, mirrored either side of the centre line. */
+  edgeline?: string;
+  edgelineWidth?: number;
+  edgelineOpacity?: number;
+  /** Perpendicular offset (px) of each edge line from the centre line. */
+  edgeOffset?: number;
+  marker: string;
+  markerLabel: string;
+  labelFamily: string;
+}
+
+/** Round every decimal in an SVG path string to 2dp for stable SSR/client output. */
+function roundCoords(d: string): string {
+  return d.replace(/\d+\.\d+/g, (m) => Number(m).toFixed(2));
+}
+
+/**
+ * Build an SVG path offset perpendicular to each LineString by `offset` px in
+ * projected screen space — used to draw the totality-edge limit lines parallel
+ * to the centre line (the source data is the centre line only).
+ */
+function offsetLineD(
+  features: FeatureCollection<LineString>["features"],
+  project: (loc: LonLat) => [number, number] | null,
+  offset: number,
+): string {
+  const parts: string[] = [];
+  for (const f of features) {
+    if (f.geometry?.type !== "LineString") continue;
+    const pts = f.geometry.coordinates
+      .map(([lon, lat]) => project({ lon, lat }))
+      .filter((p): p is [number, number] => p != null);
+    if (pts.length < 2) continue;
+    const seg: string[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - 1)];
+      const b = pts[Math.min(pts.length - 1, i + 1)];
+      let dx = b[0] - a[0];
+      let dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      // Perpendicular normal (−dy, dx) scaled by the offset.
+      const x = pts[i][0] - dy * offset;
+      const y = pts[i][1] + dx * offset;
+      seg.push(`${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`);
+    }
+    parts.push(seg.join(" "));
+  }
+  return parts.join(" ");
+}
+
+export const DEFAULT_GEO_STYLE: GeoLayerStyle = {
+  coastline: "rgba(0,0,0,0.18)",
+  coastlineWidth: 0.5,
+  centerline: "#0e1216",
+  centerlineWidth: 1.25,
+  marker: "#ff5c02",
+  markerLabel: "#0e1216",
+  labelFamily: "var(--font-geist-mono), monospace",
+};
+
+interface GeoLayerProps {
+  fit: FittedProjection;
+  path: FeatureCollection<LineString>;
+  location: LonLat & { name?: string };
+  clipId: string;
+  style?: Partial<GeoLayerStyle>;
+}
+
+export function GeoLayer({
+  fit,
+  path,
+  location,
+  clipId,
+  style,
+}: GeoLayerProps) {
+  const s = { ...DEFAULT_GEO_STYLE, ...style };
+  // geoPath emits full-precision floats whose last digit can differ between the
+  // SSR (Node) and client renders — round them so the strings match and React
+  // doesn't report a hydration mismatch.
+  const coastD = roundCoords(fit.pathGen(landFeature) ?? "");
+  const lineD = roundCoords(fit.pathGen(path) ?? "");
+  const marker = fit.project(location);
+
+  return (
+    <g clipPath={`url(#${clipId})`}>
+      <path
+        d={coastD}
+        fill="none"
+        stroke={s.coastline}
+        strokeWidth={s.coastlineWidth}
+        strokeLinejoin="round"
+      />
+      {s.edgeline && s.edgeOffset
+        ? [s.edgeOffset, -s.edgeOffset].map((off, i) => (
+            <path
+              key={i}
+              d={offsetLineD(path.features, fit.project, off)}
+              fill="none"
+              stroke={s.edgeline}
+              strokeWidth={s.edgelineWidth ?? 0.8}
+              opacity={s.edgelineOpacity ?? 0.45}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ))
+        : null}
+      {s.centerlineHalo && (
+        <path
+          d={lineD}
+          fill="none"
+          stroke={s.centerlineHalo}
+          strokeWidth={s.centerlineHaloWidth ?? s.centerlineWidth + 2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )}
+      <path
+        d={lineD}
+        fill="none"
+        stroke={s.centerline}
+        strokeWidth={s.centerlineWidth}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {marker && (
+        // Round to a stable precision so the SSR and client strings match
+        // exactly (raw projection floats differ in their last digit between
+        // Node and the browser → React hydration mismatch).
+        <g transform={`translate(${marker[0].toFixed(2)} ${marker[1].toFixed(2)})`}>
+          <circle r={3} fill={s.marker} />
+          <circle r={6.5} fill="none" stroke={s.marker} strokeWidth={0.75} />
+          {location.name && (
+            <text
+              x={10}
+              y={3.5}
+              fill={s.markerLabel}
+              fontFamily={s.labelFamily}
+              fontSize={9}
+              letterSpacing={0.5}
+            >
+              {location.name.toUpperCase()}
+            </text>
+          )}
+        </g>
+      )}
+    </g>
+  );
+}

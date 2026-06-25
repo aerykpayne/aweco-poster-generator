@@ -1,0 +1,51 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "eclipse": "2026-08-12",
+    "source": "NASA GSFC SEpath SE2026Aug12T (central line, 120s spacing)",
+    "note": "Central line only. Path passes very near the North Pole (the high-latitude rows have large longitude swings — expected). Crop the projection to the location to avoid the polar wrap.",
+    "lonlat": true
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "kind": "centerline" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [113.452, 75.078],
+          [112.487, 82.275],
+          [104.215, 85.295],
+          [81.525, 87.278],
+          [33.0, 87.823],
+          [-1.638, 86.835],
+          [-15.182, 85.403],
+          [-21.187, 83.932],
+          [-24.272, 82.495],
+          [-25.992, 81.11],
+          [-26.982, 79.773],
+          [-27.825, 77.233],
+          [-27.905, 74.837],
+          [-27.603, 72.557],
+          [-27.078, 70.365],
+          [-26.41, 68.247],
+          [-25.63, 66.185],
+          [-24.757, 64.168],
+          [-23.793, 62.183],
+          [-22.737, 60.222],
+          [-21.573, 58.272],
+          [-20.287, 56.322],
+          [-18.847, 54.362],
+          [-17.212, 52.372],
+          [-15.317, 50.333],
+          [-13.048, 48.212],
+          [-10.19, 45.943],
+          [-6.188, 43.372],
+          [-3.185, 41.817],
+          [2.95, 39.408],
+          [5.415, 38.68]
+        ]
+      }
+    }
+  ]
+}

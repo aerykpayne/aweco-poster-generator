@@ -1,0 +1,36 @@
+/**
+ * Handoff between the batch/generator views and the single-poster studio.
+ * A poster's full identity — seed, eclipse, location, headline, ratio, and its
+ * *resolved* variant (absolute values, no ranges) — is serialized into the URL
+ * so "open this poster" lands on /poster reflecting exactly what was clicked,
+ * and the link stays shareable and refresh-safe.
+ */
+import type { EclipseId } from "@/data/eclipses";
+import type { PosterLocation, Ratio } from "@/poster/types";
+import type { PosterVariant } from "@/poster/variant";
+
+export interface PosterPayload {
+  seed: string;
+  eclipseId: EclipseId;
+  location: PosterLocation;
+  headline: string;
+  ratio: Ratio;
+  variant: PosterVariant;
+}
+
+export function encodePoster(p: PosterPayload): string {
+  return encodeURIComponent(JSON.stringify(p));
+}
+
+export function decodePoster(s?: string | null): PosterPayload | null {
+  if (!s) return null;
+  try {
+    return JSON.parse(decodeURIComponent(s)) as PosterPayload;
+  } catch {
+    return null;
+  }
+}
+
+export function posterHref(p: PosterPayload): string {
+  return `/poster?p=${encodePoster(p)}`;
+}
