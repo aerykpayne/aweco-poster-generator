@@ -237,8 +237,9 @@ export function TicketSVG({
         location={{ lat: loc.lat, lon: loc.lon }}
         clipId={clipId}
         style={{
-          coastline: "rgba(255,255,255,0.16)",
-          coastlineWidth: 0.6,
+          land: "rgba(255,255,255,0.06)",
+          coastline: "rgba(255,255,255,0.30)",
+          coastlineWidth: 0.7,
           centerline: "#ffffff",
           centerlineWidth: 1.4,
           marker: "#ff5c02",

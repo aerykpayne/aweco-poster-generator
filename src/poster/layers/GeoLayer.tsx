@@ -8,6 +8,8 @@ import { landFeature } from "@/lib/coastline";
 import type { FittedProjection, LonLat } from "@/lib/projection";
 
 export interface GeoLayerStyle {
+  /** Optional faint fill under the coastline so landmasses read clearly. */
+  land?: string;
   coastline: string;
   coastlineWidth: number;
   centerline: string;
@@ -102,6 +104,7 @@ export function GeoLayer({
 
   return (
     <g clipPath={`url(#${clipId})`}>
+      {s.land && <path d={coastD} fill={s.land} stroke="none" />}
       <path
         d={coastD}
         fill="none"
@@ -146,8 +149,12 @@ export function GeoLayer({
         // exactly (raw projection floats differ in their last digit between
         // Node and the browser → React hydration mismatch).
         <g transform={`translate(${marker[0].toFixed(2)} ${marker[1].toFixed(2)})`}>
-          <circle r={3} fill={s.marker} />
-          <circle r={6.5} fill="none" stroke={s.marker} strokeWidth={0.75} />
+          {/* Prominent "you are here" pin: soft halo → outer ring → dot with a
+              crisp white outline so it reads on any background. */}
+          <circle r={13} fill={s.marker} opacity={0.18} />
+          <circle r={8} fill="none" stroke={s.marker} strokeWidth={1.25} opacity={0.9} />
+          <circle r={4.5} fill={s.marker} />
+          <circle r={4.5} fill="none" stroke="#ffffff" strokeWidth={1} opacity={0.9} />
           {location.name && (
             <text
               x={10}

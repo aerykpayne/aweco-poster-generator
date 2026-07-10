@@ -11,11 +11,12 @@ import { makeGradient, RECIPES, type GradientSpec } from "@/poster/gradient";
 import { makeRng, randomSeed } from "@/lib/rng";
 import { PosterSVG } from "@/poster/PosterSVG";
 import { TicketSVG } from "@/poster/TicketSVG";
+import { StampSVG } from "@/poster/StampSVG";
 import { FRAME, type PosterLocation, type Ratio } from "@/poster/types";
 import { decodePoster, type PosterPayload } from "@/lib/posterLink";
 
 const MONO = "var(--font-geist-mono), monospace";
-const RATIOS: Ratio[] = ["3:4", "9:16", "1:1", "ticket"];
+const RATIOS: Ratio[] = ["3:4", "9:16", "1:1", "ticket", "stamp"];
 const CORNERS: readonly Corner[] = ["tl", "tr", "bl", "br"];
 const PREVIEW_H = 760;
 
@@ -109,7 +110,8 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
   const suggestions = useMemo(() => (open ? searchCities(query) : []), [open, query]);
 
   const isTicket = ratio === "ticket";
-  const previewW = isTicket ? 560 : Math.round((PREVIEW_H * FRAME[ratio].w) / FRAME[ratio].h);
+  const isStamp = ratio === "stamp";
+  const previewW = isTicket ? 560 : isStamp ? 300 : Math.round((PREVIEW_H * FRAME[ratio].w) / FRAME[ratio].h);
 
   // ── variant helpers ─────────────────────────────────────────
   const m = variant.motif;
@@ -226,8 +228,8 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
             )}
           </div>
 
-          {/* Headline copy is irrelevant to the ticket layout. */}
-          {!isTicket && (
+          {/* Headline copy is irrelevant to the ticket / stamp layouts. */}
+          {!isTicket && !isStamp && (
             <div style={panel}>
               <p style={h}>HEADLINE</p>
               <textarea value={headline} onChange={(e) => setHeadline(e.target.value)} rows={2} spellCheck={false} style={{ ...input, resize: "vertical", lineHeight: 1.5 }} />
@@ -290,7 +292,7 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
               <p style={h}>TYPOGRAPHY</p>
               <Check on={variant.layout.headline.editorial} label="editorial italic" onToggle={() => setHl({ editorial: !variant.layout.headline.editorial })} />
             </div>
-          ) : (
+          ) : isStamp ? null : (
             <div style={panel}>
               <p style={h}>HEADLINE LAYOUT</p>
               <Seg label="position" value={variant.layout.headline.vpos} options={["high", "low"] as const} onChange={(v) => setHl({ vpos: v })} />
@@ -333,6 +335,8 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
           <div style={{ width: previewW, maxWidth: "100%" }}>
             {isTicket ? (
               <TicketSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
+            ) : isStamp ? (
+              <StampSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
             ) : (
               <PosterSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
             )}

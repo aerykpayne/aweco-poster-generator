@@ -10,11 +10,12 @@ import { makeVariant } from "@/poster/variant";
 import { randomSeed } from "@/lib/rng";
 import { PosterSVG } from "@/poster/PosterSVG";
 import { TicketSVG } from "@/poster/TicketSVG";
+import { StampSVG } from "@/poster/StampSVG";
 import { posterHref } from "@/lib/posterLink";
 import { FRAME, type PosterLocation, type Ratio } from "@/poster/types";
 
 const MONO = "var(--font-geist-mono), monospace";
-const RATIOS: Ratio[] = ["3:4", "9:16", "1:1", "ticket"];
+const RATIOS: Ratio[] = ["3:4", "9:16", "1:1", "ticket", "stamp"];
 const PREVIEW_H = 620;
 
 const label: React.CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: 1.5, color: "#8e8d8d", display: "block", margin: "0 0 6px" };
@@ -60,7 +61,8 @@ export function Generator() {
   };
 
   const isTicket = ratio === "ticket";
-  const previewW = isTicket ? 520 : Math.round((PREVIEW_H * FRAME[ratio].w) / FRAME[ratio].h);
+  const isStamp = ratio === "stamp";
+  const previewW = isTicket ? 520 : isStamp ? 268 : Math.round((PREVIEW_H * FRAME[ratio].w) / FRAME[ratio].h);
 
   return (
     <div style={{ display: "flex", gap: 36, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -171,6 +173,8 @@ export function Generator() {
         <div style={{ width: previewW, maxWidth: "100%" }}>
           {isTicket ? (
             <TicketSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
+          ) : isStamp ? (
+            <StampSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
           ) : (
             <PosterSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
           )}

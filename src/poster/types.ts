@@ -1,7 +1,7 @@
 import type { EclipseRecord } from "@/data/eclipses";
 import type { Circumstances } from "@/lib/astronomy";
 
-export type Ratio = "3:4" | "9:16" | "1:1" | "ticket";
+export type Ratio = "3:4" | "9:16" | "1:1" | "ticket" | "stamp";
 
 export interface PosterLocation {
   name: string;
@@ -28,4 +28,6 @@ export const FRAME: Record<Ratio, { w: number; h: number }> = {
   "1:1": { w: 820, h: 820 },
   // Landscape ticket stub (~1.8:1), matching the boarding-pass reference.
   ticket: { w: 900, h: 500 },
+  // Small square commemorative stamp / badge.
+  stamp: { w: 520, h: 520 },
 };
