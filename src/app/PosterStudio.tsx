@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { computeCircumstances } from "@/lib/astronomy";
 import { ECLIPSES, ECLIPSE_LIST, type EclipseId } from "@/data/eclipses";
 import { searchCities, nearestCityTz, type City } from "@/lib/cities";
@@ -14,6 +14,7 @@ import { TicketSVG } from "@/poster/TicketSVG";
 import { StampSVG } from "@/poster/StampSVG";
 import { FRAME, type PosterLocation, type Ratio } from "@/poster/types";
 import { decodePoster, type PosterPayload } from "@/lib/posterLink";
+import { loadSignatureFile, type AudioSignature } from "@/lib/audioSignature";
 
 const MONO = "var(--font-geist-mono), monospace";
 const RATIOS: Ratio[] = ["3:4", "9:16", "1:1", "ticket", "stamp"];
@@ -101,6 +102,34 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
   // Separate seed for gradient re-rolls so other dials stay untouched.
   const [gradSeed, setGradSeed] = useState(init.seed);
 
+  // Audio corona (studio-only — not part of the seeded variant / share link).
+  const [audioSig, setAudioSig] = useState<AudioSignature | null>(null);
+  const [audioOn, setAudioOn] = useState(true);
+  const [audioName, setAudioName] = useState<string | null>(null);
+  const [audioErr, setAudioErr] = useState<string | null>(null);
+  const [audioBusy, setAudioBusy] = useState(false);
+  const [rayCount, setRayCount] = useState(240);
+  const [rayLen, setRayLen] = useState(0.7);
+  const [roundTips, setRoundTips] = useState(false);
+  const [hiContrast, setHiContrast] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onAudioFile = async (file: File | undefined) => {
+    if (!file) return;
+    setAudioBusy(true);
+    setAudioErr(null);
+    try {
+      const sig = await loadSignatureFile(file);
+      setAudioSig(sig);
+      setAudioName(file.name);
+      setAudioOn(true);
+    } catch (e) {
+      setAudioErr(e instanceof Error ? e.message : "Could not read that file.");
+    } finally {
+      setAudioBusy(false);
+    }
+  };
+
   const eclipse = ECLIPSES[eclipseId];
   const base = eclipse.baseSpanDeg;
   const circumstances = useMemo(
@@ -112,6 +141,7 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
   const isTicket = ratio === "ticket";
   const isStamp = ratio === "stamp";
   const previewW = isTicket ? 560 : isStamp ? 300 : Math.round((PREVIEW_H * FRAME[ratio].w) / FRAME[ratio].h);
+  const audio = audioSig && audioOn ? { signature: audioSig, rayCount, rayLen, roundTips, highContrast: hiContrast } : null;
 
   // ── variant helpers ─────────────────────────────────────────
   const m = variant.motif;
@@ -259,6 +289,48 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
               <Range label="limb size" min={0.5} max={3} step={0.05} value={m.limbSize ?? 1.6} onChange={(n) => setMotif({ limbSize: n })} />
               <Range label="glow area" min={0} max={1} step={0.02} value={m.glowArea ?? 0.6} onChange={(n) => setMotif({ glowArea: n })} />
             </div>
+
+            {!isTicket && !isStamp && (
+              <>
+                <p style={{ ...lbl, fontSize: 9, letterSpacing: 1.5, margin: "14px 0 8px", borderTop: "1px solid #2a2d33", paddingTop: 10 }}>
+                  AUDIO CORONA
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".json,application/json,audio/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => onAudioFile(e.target.files?.[0])}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    style={{ fontFamily: MONO, fontSize: 10, color: "#0e1216", background: "#e2e2e2", border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer" }}
+                  >
+                    {audioBusy ? "reading…" : audioSig ? "replace audio ↑" : "upload audio / .json ↑"}
+                  </button>
+                  {audioSig && <Check on={audioOn} label="show" onToggle={() => setAudioOn((v) => !v)} />}
+                </div>
+                {audioName && !audioErr && (
+                  <p style={{ ...lbl, fontSize: 9, color: "#8e8d8d", margin: "6px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    ▸ {audioName}
+                  </p>
+                )}
+                {audioErr && (
+                  <p style={{ fontFamily: MONO, fontSize: 9.5, color: "#d8915a", margin: "6px 0 0" }}>{audioErr}</p>
+                )}
+                {audioSig && (
+                  <div style={{ marginTop: 10, opacity: audioOn ? 1 : 0.4, pointerEvents: audioOn ? "auto" : "none" }}>
+                    <Range label="rays" min={120} max={360} step={4} value={rayCount} onChange={setRayCount} />
+                    <Range label="spike len" min={0.2} max={1.4} step={0.02} value={rayLen} onChange={setRayLen} />
+                    <div style={{ marginTop: 6 }}>
+                      <Check on={roundTips} label="rounded tips" onToggle={() => setRoundTips((v) => !v)} />
+                      <Check on={hiContrast} label="high contrast" onToggle={() => setHiContrast((v) => !v)} />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div style={panel}>
@@ -338,7 +410,7 @@ export function PosterStudio({ encoded }: { encoded?: string | null }) {
             ) : isStamp ? (
               <StampSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
             ) : (
-              <PosterSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} />
+              <PosterSVG model={{ eclipse, location, circumstances, aspiration: headline, ratio }} variant={variant} audio={audio} />
             )}
           </div>
           <div style={{ display: "flex", gap: 6, marginTop: 12 }}>

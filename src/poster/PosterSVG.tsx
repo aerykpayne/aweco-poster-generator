@@ -12,10 +12,25 @@ import {
 } from "@/lib/astronomy";
 import { GeoLayer } from "@/poster/layers/GeoLayer";
 import { CircleMotif } from "@/poster/layers/CircleMotif";
+import { AudioCorona } from "@/poster/layers/AudioCorona";
 import { EclipseBadge, AweCoBadge } from "@/poster/marks";
 import { textColorOn } from "@/poster/gradient";
 import { FRAME, type PosterModel } from "@/poster/types";
 import type { Corner, PosterVariant } from "@/poster/variant";
+import type { AudioSignature } from "@/lib/audioSignature";
+
+/** Optional audio-signature sunburst around the eclipse ring (studio-only). */
+export interface AudioCoronaOpts {
+  signature: AudioSignature;
+  /** Rays around the circle. */
+  rayCount: number;
+  /** Max ray length as a fraction of the ring radius. */
+  rayLen: number;
+  /** Soft round-capped rays instead of sharp tapered spikes. */
+  roundTips: boolean;
+  /** Use a high-contrast (white) corona instead of the warm gradient tone. */
+  highContrast: boolean;
+}
 
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";
 const DISPLAY = "var(--font-neue-york-narrow), var(--font-neue-york), Georgia, serif";
@@ -43,9 +58,11 @@ function metaRows(model: PosterModel) {
 export function PosterSVG({
   model,
   variant,
+  audio,
 }: {
   model: PosterModel;
   variant: PosterVariant;
+  audio?: AudioCoronaOpts | null;
 }) {
   const { w: W, h: H } = FRAME[model.ratio];
   const U = Math.min(W, H);
@@ -68,6 +85,10 @@ export function PosterSVG({
   const clipId = `frame-${uid}`;
   const rows = metaRows(model);
   const motif = variant.motif;
+  const mCx = motif.cxFrac * W;
+  const mCy = motif.cyFrac * H;
+  const mR = motif.scale * U;
+  const coronaWarm = g.stops[g.stops.length - 2]?.color ?? "#fda689";
 
   // Corner colour helper (legibility-aware).
   const cornerColor = (c: Corner) =>
@@ -189,9 +210,9 @@ export function PosterSVG({
 
       <CircleMotif
         kind={motif.kind}
-        cx={motif.cxFrac * W}
-        cy={motif.cyFrac * H}
-        r={motif.scale * U}
+        cx={mCx}
+        cy={mCy}
+        r={mR}
         gradient={g}
         uid={uid}
         shadowX={motif.shadowX}
@@ -199,6 +220,19 @@ export function PosterSVG({
         limbSize={motif.limbSize}
         glowArea={motif.glowArea}
       />
+
+      {audio && motif.kind !== "none" && (
+        <AudioCorona
+          cx={mCx}
+          cy={mCy}
+          r={mR}
+          signature={audio.signature}
+          rayCount={audio.rayCount}
+          rayMax={mR * audio.rayLen}
+          color={audio.highContrast ? "#ffffff" : coronaWarm}
+          roundTips={audio.roundTips}
+        />
+      )}
 
       <GeoLayer
         fit={fit}
